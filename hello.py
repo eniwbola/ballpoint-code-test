@@ -7,4 +7,5 @@ print('pasted hello')
 print('yes')
 print('hey')
 print('dog')
-
+print('def')
+print('fefe')
