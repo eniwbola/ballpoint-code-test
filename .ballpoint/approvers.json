@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "resolver": "https://verify.ballpoint.app",
+  "requireOwnerKey": true,
+  "approvers": [
+    {
+      "label": "Bola's phone",
+      "ownerPubHex": "042c419b83b887e61ca32e1988488cfd18c2d2746cd1ccd1420ac3ad8b44c4679f397b5c0514ebf852ac43aa6b964a80ab38373208624736ad4c3a5b41cb7df2b9",
+      "deviceKeySha256": "7cf11d8185ab92d1cac7fd256ea21849d70a0ab8f12f39373f8bc2de309f73a7"
+    }
+  ]
+}

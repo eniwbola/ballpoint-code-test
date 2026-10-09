@@ -1,0 +1,59 @@
+# Ballpoint approvals for AI agents: the REMOTE check (git-attest/AGENTS.md).
+# Copy to .github/workflows/ballpoint-approval.yml on the protected branch, then make "ballpoint-approval" a required
+# status check (Settings ▸ Rules / Branch protection) together with "Require a pull request before merging".
+#
+# Why pull_request_target: it runs THIS file as it is on the base branch, so a pull request cannot edit the check that
+# judges it. It never runs the pull request's code: it fetches the commits as data and checks receipts. The allow-list
+# (.ballpoint/approvers.json) is read from the base commit for the same reason.
+name: ballpoint-approval
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  # Only for the last step (GitHub's own attestations of the phone approvals); remove both lines to skip it.
+  id-token: write
+  attestations: write
+jobs:
+  ballpoint-approval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch the pull request's commits (as data, never checked out)
+        run: git fetch --no-tags origin "+refs/pull/${{ github.event.pull_request.number }}/head:refs/ballpoint/pr-head"
+      # Hash-only approvals (the default) keep each card the phone was shown as a git note, pushed with the branch: from the
+      # base repository, or from the fork a pull request comes from. Data only; a missing ref just means none were pushed.
+      - name: Fetch the approval cards (git notes)
+        run: |
+          git fetch --no-tags origin "+refs/notes/ballpoint-cards:refs/notes/ballpoint-cards" || true
+          git fetch --no-tags "${{ github.event.pull_request.head.repo.clone_url }}" "+refs/notes/ballpoint-cards:refs/notes/ballpoint-cards-head" || true
+          if git rev-parse -q --verify refs/notes/ballpoint-cards-head >/dev/null; then
+            if git rev-parse -q --verify refs/notes/ballpoint-cards >/dev/null; then git notes --ref=ballpoint-cards merge -s union refs/notes/ballpoint-cards-head || true
+            else git update-ref refs/notes/ballpoint-cards refs/notes/ballpoint-cards-head; fi
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Every new commit approved on a pinned phone
+        run: >
+          npx -y git-ballpoint@0.2.0 agent check
+          --base "${{ github.event.pull_request.base.sha }}"
+          --head "${{ github.event.pull_request.head.sha }}"
+          --repo "${{ github.repository }}"
+          --attest-dir ballpoint-attest
+      # GITHUB-NATIVE ATTESTATIONS (optional): each phone receipt that approved this pull request, signed by THIS workflow's
+      # identity through Sigstore and kept in the repository's Attestations tab. Anyone checks one with:
+      #   curl -s -H 'accept: application/json' <receipt url> -o receipt.json
+      #   gh attestation verify receipt.json --repo <owner/repo> --predicate-type https://ballpoint.app/attestation/agent-approval-verified/v1
+      # Public repositories on any plan; private ones need GitHub Enterprise Cloud.
+      - name: Record the phone approvals as GitHub attestations
+        if: success() && hashFiles('ballpoint-attest/receipts/*.json') != ''
+        uses: actions/attest@v2
+        with:
+          subject-path: 'ballpoint-attest/receipts/*.json'
+          predicate-type: 'https://ballpoint.app/attestation/agent-approval-verified/v1'
+          predicate-path: 'ballpoint-attest/predicate.json'
