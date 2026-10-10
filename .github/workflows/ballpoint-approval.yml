@@ -40,7 +40,7 @@ jobs:
           node-version: 22
       - name: Every new commit approved on a pinned phone
         run: >
-          npx -y git-ballpoint@0.2.0 agent check
+          npx -y git-ballpoint@0.2.1 agent check
           --base "${{ github.event.pull_request.base.sha }}"
           --head "${{ github.event.pull_request.head.sha }}"
           --repo "${{ github.repository }}"
